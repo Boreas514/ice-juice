@@ -1,9 +1,9 @@
-import stitch_winshell
-import stitch_osxshell
-import stitch_lnxshell
-from stitch_gen import *
-from stitch_help import *
-from stitch_utils import *
+from . import stitch_winshell
+from . import stitch_osxshell
+from . import stitch_lnxshell
+from .stitch_gen import *
+from .stitch_help import *
+from .stitch_utils import *
 
 class stitch_server(cmd.Cmd):
     inf_sock = {}

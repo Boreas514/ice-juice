@@ -1,5 +1,5 @@
-from stitch_help import *
-from stitch_utils import *
+from .stitch_help import *
+from .stitch_utils import *
 
 def st_recvall(client, count, aes_enc=None, encryption=True):
     buf = b''

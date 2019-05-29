@@ -1,4 +1,4 @@
-from stitch_utils import st_print
+from .stitch_utils import st_print
 
 ################################################################################
 #                        Start of USAGE Section                                #
