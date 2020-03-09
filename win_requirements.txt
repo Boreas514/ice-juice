@@ -1,0 +1,12 @@
+colorama
+
+
+pillow
+
+PyInstaller
+
+
+pycryptodome
+pyreadline
+pywin32
+requests

@@ -3,7 +3,7 @@ import os
 import sys
 from os import rename
 from os.path import isfile
-from mss import ScreenshotError
+from mss.exception import ScreenShotError
 
 temp = get_temp()
 

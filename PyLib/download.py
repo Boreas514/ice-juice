@@ -8,7 +8,7 @@ else:
     temp = '/tmp/'
 cur_dir = os.getcwd()
 content = ''
-d_file = receive(client_socket)
+d_file = receive(client_socket).decode()
 if temp in d_file:
     if os.path.exists(d_file):
         os.chdir(temp)

